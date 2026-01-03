@@ -31,12 +31,14 @@ class Profile(Base):
     system_prompt = Column(Text, nullable=False)
     is_default = Column(Boolean, default=False)  # True for system defaults
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # NULL for defaults
+    parent_id = Column(Integer, ForeignKey('profiles.id'), nullable=True)  # For copy-on-write
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     owner = relationship("User", back_populates="custom_profiles",
                         foreign_keys=[user_id])
+    parent = relationship("Profile", remote_side=[id], foreign_keys=[parent_id])
 
 class UsageLog(Base):
     __tablename__ = 'usage_logs'

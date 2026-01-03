@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker, scoped_session
 from database.models import Base, Profile
 import os
@@ -9,9 +9,29 @@ engine = create_engine(DATABASE_URL, echo=False)
 session_factory = sessionmaker(bind=engine)
 Session = scoped_session(session_factory)
 
+
+def migrate_db():
+    """Run database migrations"""
+    inspector = inspect(engine)
+
+    # Check if profiles table exists
+    if 'profiles' in inspector.get_table_names():
+        columns = [col['name'] for col in inspector.get_columns('profiles')]
+
+        # Add parent_id column if it doesn't exist
+        if 'parent_id' not in columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE profiles ADD COLUMN parent_id INTEGER REFERENCES profiles(id)"))
+                conn.commit()
+            print("✅ Migration: Added parent_id column to profiles table")
+
+
 def init_db():
     """Initialize database and create default profiles"""
     Base.metadata.create_all(engine)
+
+    # Run migrations for existing databases
+    migrate_db()
 
     # Create default profiles if they don't exist
     session = Session()
