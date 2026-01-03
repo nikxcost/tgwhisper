@@ -1,0 +1,90 @@
+from aiogram import Router, F
+from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery
+from database.database import Session
+from database.models import User, Profile
+from bot.keyboards.inline import get_profiles_keyboard
+
+router = Router()
+
+@router.message(Command("profiles"))
+async def cmd_profiles(message: Message):
+    """Handle /profiles command"""
+    session = Session()
+    try:
+        # Get all profiles available to user (default + user's custom)
+        default_profiles = session.query(Profile).filter_by(is_default=True).all()
+        user_profiles = session.query(Profile).filter_by(
+            user_id=message.from_user.id,
+            is_default=False
+        ).all()
+
+        all_profiles = default_profiles + user_profiles
+
+        if not all_profiles:
+            await message.answer("❌ Профили не найдены")
+            return
+
+        keyboard = get_profiles_keyboard(all_profiles)
+        await message.answer(
+            "📋 <b>Выберите профиль форматирования:</b>\n\n"
+            "⭐ - Стандартные профили\n"
+            "✏️ - Ваши профили",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    finally:
+        session.close()
+
+
+@router.callback_query(F.data.startswith("select_profile:"))
+async def select_profile_callback(callback: CallbackQuery):
+    """Handle profile selection"""
+    profile_id = int(callback.data.split(":")[1])
+
+    session = Session()
+    try:
+        user = session.query(User).filter_by(id=callback.from_user.id).first()
+        profile = session.query(Profile).filter_by(id=profile_id).first()
+
+        if not profile:
+            await callback.answer("❌ Профиль не найден", show_alert=True)
+            return
+
+        # Update user's selected profile
+        user.selected_profile_id = profile_id
+        session.commit()
+
+        await callback.message.edit_text(
+            f"✅ <b>Активный профиль:</b> {profile.name}\n\n"
+            f"📝 <b>Описание:</b> {profile.description}\n\n"
+            "Теперь отправьте голосовое сообщение для обработки!",
+            parse_mode="HTML"
+        )
+        await callback.answer()
+
+    finally:
+        session.close()
+
+
+@router.callback_query(F.data.startswith("profiles_page:"))
+async def profiles_page_callback(callback: CallbackQuery):
+    """Handle pagination"""
+    page = int(callback.data.split(":")[1])
+
+    session = Session()
+    try:
+        default_profiles = session.query(Profile).filter_by(is_default=True).all()
+        user_profiles = session.query(Profile).filter_by(
+            user_id=callback.from_user.id,
+            is_default=False
+        ).all()
+
+        all_profiles = default_profiles + user_profiles
+        keyboard = get_profiles_keyboard(all_profiles, page=page)
+
+        await callback.message.edit_reply_markup(reply_markup=keyboard)
+        await callback.answer()
+
+    finally:
+        session.close()
