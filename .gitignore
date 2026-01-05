@@ -44,6 +44,13 @@ env/
 *.log
 logs/
 
+# Runtime files
+.bot.pid
+.supervisor.lock
+
+# Backups
+backups/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -11,6 +11,9 @@ router = Router()
 @router.callback_query(F.data == "create_profile")
 async def start_profile_creation(callback: CallbackQuery, state: FSMContext):
     """Start the profile creation flow"""
+    from utils.logger import logger
+    logger.info(f"User {callback.from_user.id} started profile creation")
+
     session = Session()
     user = session.query(User).filter_by(id=callback.from_user.id).first()
 
@@ -42,6 +45,10 @@ async def start_profile_creation(callback: CallbackQuery, state: FSMContext):
 @router.message(ProfileCreation.entering_name)
 async def process_profile_name(message: Message, state: FSMContext):
     """Process profile name input"""
+    from utils.logger import logger
+    current_state = await state.get_state()
+    logger.info(f"process_profile_name called. Current state: {current_state}, user: {message.from_user.id}, text: {message.text}")
+
     name = message.text.strip()
 
     if len(name) > 100:
@@ -49,16 +56,23 @@ async def process_profile_name(message: Message, state: FSMContext):
         return
 
     await state.update_data(name=name)
+
     await message.answer(
         f"✅ Название: <b>{name}</b>\n\n"
         "Теперь введите описание профиля (что он делает):",
         parse_mode="HTML"
     )
     await state.set_state(ProfileCreation.entering_description)
+    new_state = await state.get_state()
+    logger.info(f"State changed from {current_state} to {new_state}")
 
 @router.message(ProfileCreation.entering_description)
 async def process_profile_description(message: Message, state: FSMContext):
     """Process profile description input"""
+    from utils.logger import logger
+    current_state = await state.get_state()
+    logger.info(f"process_profile_description called. Current state: {current_state}, text: {message.text[:50]}")
+
     description = message.text.strip()
 
     if len(description) > 500:
@@ -75,10 +89,16 @@ async def process_profile_description(message: Message, state: FSMContext):
         parse_mode="HTML"
     )
     await state.set_state(ProfileCreation.entering_prompt)
+    new_state = await state.get_state()
+    logger.info(f"State changed from {current_state} to {new_state}")
 
 @router.message(ProfileCreation.entering_prompt)
 async def process_profile_prompt(message: Message, state: FSMContext):
     """Process system prompt and create profile"""
+    from utils.logger import logger
+    current_state = await state.get_state()
+    logger.info(f"process_profile_prompt called. Current state: {current_state}, text: {message.text[:50]}")
+
     prompt = message.text.strip()
 
     if len(prompt) < 10:
