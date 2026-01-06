@@ -23,6 +23,18 @@ class Config:
     MAX_VOICE_DURATION: int = 300  # 5 minutes
     MAX_CUSTOM_PROFILES: int = 10  # Per user
 
+    # Admin Configuration
+    # Comma-separated list of Telegram user IDs with admin access
+    ADMIN_USER_IDS: list = None
+
+    def __post_init__(self):
+        # Parse ADMIN_USER_IDS from environment
+        admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+        self.ADMIN_USER_IDS = [
+            int(id.strip()) for id in admin_ids_str.split(",")
+            if id.strip() and id.strip().isdigit()
+        ]
+
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE: str = "bot.log"

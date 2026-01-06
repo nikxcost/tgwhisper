@@ -25,6 +25,47 @@ def migrate_db():
                 conn.commit()
             print("✅ Migration: Added parent_id column to profiles table")
 
+    # Add indexes for analytics performance
+    migrate_add_analytics_indexes(inspector)
+
+
+def migrate_add_analytics_indexes(inspector=None):
+    """Add indexes for analytics query performance"""
+    if inspector is None:
+        inspector = inspect(engine)
+
+    # Get existing indexes to avoid duplicates
+    existing_indexes = set()
+    for table in ['usage_logs', 'users']:
+        if table in inspector.get_table_names():
+            for idx in inspector.get_indexes(table):
+                existing_indexes.add(idx['name'])
+
+    # Define indexes to add
+    indexes_to_create = [
+        ("idx_usage_logs_user_created",
+         "CREATE INDEX idx_usage_logs_user_created ON usage_logs(user_id, created_at)"),
+        ("idx_usage_logs_profile_created",
+         "CREATE INDEX idx_usage_logs_profile_created ON usage_logs(profile_id, created_at)"),
+        ("idx_usage_logs_success_created",
+         "CREATE INDEX idx_usage_logs_success_created ON usage_logs(success, created_at)"),
+        ("idx_users_last_activity",
+         "CREATE INDEX idx_users_last_activity ON users(last_activity)"),
+        ("idx_users_created_at",
+         "CREATE INDEX idx_users_created_at ON users(created_at)")
+    ]
+
+    # Create missing indexes
+    with engine.connect() as conn:
+        for idx_name, idx_sql in indexes_to_create:
+            if idx_name not in existing_indexes:
+                try:
+                    conn.execute(text(idx_sql))
+                    conn.commit()
+                    print(f"✅ Migration: Created index {idx_name}")
+                except Exception as e:
+                    print(f"⚠️ Migration: Could not create index {idx_name}: {e}")
+
 
 def init_db():
     """Initialize database and create default profiles"""

@@ -1,10 +1,10 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, BotCommandScopeChat
 from config import config
 from database.database import init_db
-from bot.handlers import start, voice, profiles, profile_create, profile_edit, history, profile_export
+from bot.handlers import start, voice, profiles, profile_create, profile_edit, history, profile_export, analytics
 from bot.middlewares.user_middleware import UserMiddleware
 from utils.logger import logger
 
@@ -19,6 +19,20 @@ async def set_bot_commands(bot: Bot):
         BotCommand(command="help", description="Справка"),
     ]
     await bot.set_my_commands(commands)
+
+    # Add analytics command for admin users only
+    if config.ADMIN_USER_IDS:
+        admin_commands = commands + [
+            BotCommand(command="analytics", description="Экспорт аналитики")
+        ]
+        for admin_id in config.ADMIN_USER_IDS:
+            try:
+                await bot.set_my_commands(
+                    admin_commands,
+                    scope=BotCommandScopeChat(chat_id=admin_id)
+                )
+            except Exception as e:
+                logger.warning(f"Could not set admin commands for {admin_id}: {e}")
 
 async def main():
     """Main entry point for the bot"""
@@ -55,6 +69,7 @@ async def main():
     dp.include_router(profile_edit.router)
     dp.include_router(history.router)
     dp.include_router(profile_export.router)
+    dp.include_router(analytics.router)
 
     # Set bot commands menu
     await set_bot_commands(bot)
